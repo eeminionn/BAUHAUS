@@ -1,0 +1,531 @@
+// Proyecto OOP - Composición interactiva Bauhaus
+// Concepto: Tensión geométrica inspirada en la Bauhaus
+// Autor: @eeminionn en GitHub
+// Repositorio: https://github.com/eeminionn/BAUHAUS/blob/main/bauhausv1
+// Desarrollado en p5.js
+
+let piezas = [];
+let lineasFondo = [];
+let cantidadInicial = 22;
+
+let seleccionada = null;
+let animar = true;
+let mostrarFondo = true;
+let modoOscuro = false;
+let mostrarAyuda = true;
+
+let velocidadGlobal = 1;
+let historial = [];
+
+// Esta semilla hace que el reset vuelva siempre al mismo inicio
+let seedInicial = 2026;
+
+let paleta = [
+  "#E53935", // rojo
+  "#FBC02D", // amarillo
+  "#1565C0", // azul
+  "#00A6A6", // celeste
+  "#111111", // negro
+  "#F4EFE6"  // crema
+];
+
+function setup() {
+  createCanvas(950, 620);
+  angleMode(DEGREES);
+  rectMode(CENTER);
+  textFont("monospace");
+
+  generarComposicion();
+}
+
+function draw() {
+  background(modoOscuro ? "#101010" : "#F4EFE6");
+
+  if (mostrarFondo) {
+    dibujarFondo();
+  }
+
+  // Actualiza y dibuja todas las piezas del array
+  for (let i = 0; i < piezas.length; i++) {
+    piezas[i].actualizar();
+    piezas[i].dibujar();
+  }
+
+  if (mostrarAyuda) {
+    dibujarInfo();
+  }
+}
+
+function generarComposicion() {
+  // Con esto el reset siempre vuelve al mismo resultado
+  randomSeed(seedInicial);
+
+  piezas = [];
+  lineasFondo = [];
+  seleccionada = null;
+  historial = [];
+
+  // Líneas fijas de fondo
+  for (let i = 0; i < 34; i++) {
+    lineasFondo.push({
+      x1: random(width),
+      y1: random(height),
+      x2: random(width),
+      y2: random(height),
+      grosor: random(0.5, 2.2),
+      alpha: random(25, 75)
+    });
+  }
+
+  // Varias versiones de la misma clase
+  for (let i = 0; i < cantidadInicial; i++) {
+    let x = random(90, width - 90);
+    let y = random(90, height - 90);
+    let tam = random(45, 115);
+    let tipo = int(random(4));
+    let colorPrincipal = random(paleta);
+    let colorSecundario = random(paleta);
+    let rotacion = random(360);
+    let velocidad = random(-1.4, 1.4);
+    let repeticiones = int(random(2, 8));
+
+    piezas.push(
+      new PiezaBauhaus(
+        x,
+        y,
+        tam,
+        tipo,
+        colorPrincipal,
+        colorSecundario,
+        rotacion,
+        velocidad,
+        repeticiones
+      )
+    );
+  }
+
+  // Después del reset, la aleatoriedad vuelve a quedar libre
+  randomSeed(millis());
+}
+
+function dibujarFondo() {
+  push();
+
+  // Líneas diagonales del fondo
+  for (let i = 0; i < lineasFondo.length; i++) {
+    let l = lineasFondo[i];
+
+    stroke(modoOscuro ? 255 : 0, l.alpha);
+    strokeWeight(l.grosor);
+    line(l.x1, l.y1, l.x2, l.y2);
+  }
+
+  // Grilla suave
+  stroke(modoOscuro ? 255 : 0, 18);
+  strokeWeight(1);
+
+  for (let x = 0; x < width; x += 60) {
+    line(x, 0, x, height);
+  }
+
+  for (let y = 0; y < height; y += 60) {
+    line(0, y, width, y);
+  }
+
+  pop();
+}
+
+function dibujarInfo() {
+  push();
+
+  noStroke();
+  fill(modoOscuro ? 255 : 0, 210);
+  textSize(12);
+
+  text("ESPACIO: volver al inicio | R: randomizar | A: animación | L: fondo | O: modo oscuro | H: ayuda | Z: deshacer", 20, height - 42);
+  text("Click: altera una pieza | Drag: mueve una pieza | Rueda: tamaño | Doble click: crear nueva pieza", 20, height - 22);
+
+  pop();
+}
+
+// -------------------------
+// Teclado
+// -------------------------
+
+function keyPressed() {
+  // Reset: vuelve siempre a la composición inicial
+  if (key === " ") {
+    generarComposicion();
+  }
+
+  // Randomizar: cambia la composición actual
+  if (key === "r" || key === "R") {
+    guardarEstado();
+
+    // Esto hace que R sea distinto cada vez
+    randomSeed(millis());
+
+    for (let i = 0; i < piezas.length; i++) {
+      piezas[i].randomizar();
+    }
+  }
+
+  // Pausa o activa el movimiento
+  if (key === "a" || key === "A") {
+    animar = !animar;
+  }
+
+  // Muestra u oculta el fondo
+  if (key === "l" || key === "L") {
+    mostrarFondo = !mostrarFondo;
+  }
+
+  // Cambia entre claro y oscuro
+  if (key === "o" || key === "O") {
+    modoOscuro = !modoOscuro;
+  }
+
+  // Muestra u oculta instrucciones
+  if (key === "h" || key === "H") {
+    mostrarAyuda = !mostrarAyuda;
+  }
+
+  // Vuelve al estado anterior
+  if (key === "z" || key === "Z") {
+    deshacer();
+  }
+
+  // Sube la velocidad general
+  if (keyCode === UP_ARROW) {
+    velocidadGlobal += 0.15;
+  }
+
+  // Baja la velocidad general
+  if (keyCode === DOWN_ARROW) {
+    velocidadGlobal -= 0.15;
+    velocidadGlobal = max(0, velocidadGlobal);
+  }
+}
+
+// -------------------------
+// Mouse
+// -------------------------
+
+function mousePressed() {
+  seleccionada = null;
+
+  // Recorro al revés para tomar la pieza más encima
+  for (let i = piezas.length - 1; i >= 0; i--) {
+    if (piezas[i].contiene(mouseX, mouseY)) {
+      guardarEstado();
+      seleccionada = piezas[i];
+      seleccionada.alterarPorClick();
+      break;
+    }
+  }
+}
+
+function mouseDragged() {
+  // Mueve solo la pieza seleccionada
+  if (seleccionada !== null) {
+    seleccionada.arrastrar(mouseX, mouseY);
+  }
+}
+
+function mouseWheel(event) {
+  // Cambia el tamaño con la rueda
+  if (seleccionada !== null) {
+    guardarEstado();
+    seleccionada.cambiarTamano(event.delta);
+  }
+
+  return false;
+}
+
+function doubleClicked() {
+  guardarEstado();
+
+  // Crea una pieza nueva donde está el mouse
+  let nuevaPieza = new PiezaBauhaus(
+    mouseX,
+    mouseY,
+    random(55, 120),
+    int(random(4)),
+    random(paleta),
+    random(paleta),
+    random(360),
+    random(-1.5, 1.5),
+    int(random(2, 9))
+  );
+
+  piezas.push(nuevaPieza);
+  seleccionada = nuevaPieza;
+}
+
+// -------------------------
+// Historial para deshacer
+// -------------------------
+
+function guardarEstado() {
+  let copia = [];
+
+  for (let i = 0; i < piezas.length; i++) {
+    copia.push(piezas[i].exportar());
+  }
+
+  historial.push(copia);
+
+  // Evita guardar demasiados estados
+  if (historial.length > 15) {
+    historial.shift();
+  }
+}
+
+function deshacer() {
+  if (historial.length === 0) return;
+
+  let estadoAnterior = historial.pop();
+  piezas = [];
+
+  for (let i = 0; i < estadoAnterior.length; i++) {
+    piezas.push(PiezaBauhaus.desdeDatos(estadoAnterior[i]));
+  }
+
+  seleccionada = null;
+}
+
+// -------------------------
+// Clase principal
+// -------------------------
+
+class PiezaBauhaus {
+  constructor(x, y, tam, tipo, colorPrincipal, colorSecundario, rotacion, velocidad, repeticiones) {
+    this.x = x;
+    this.y = y;
+    this.tam = tam;
+    this.tipo = tipo;
+
+    this.colorPrincipal = colorPrincipal;
+    this.colorSecundario = colorSecundario;
+
+    this.rotacion = rotacion;
+    this.velocidad = velocidad;
+    this.repeticiones = repeticiones;
+
+    // Pequeñas diferencias entre piezas
+    this.fase = random(360);
+    this.amplitud = random(0.08, 0.35);
+    this.escala = 1;
+
+    this.grosorLinea = random(1, 4);
+    this.desfaseInterno = random(360);
+  }
+
+  actualizar() {
+    // Movimiento suave
+    if (animar) {
+      this.rotacion += this.velocidad * velocidadGlobal;
+
+      this.x += sin(frameCount * 0.6 + this.fase) * this.amplitud;
+      this.y += cos(frameCount * 0.5 + this.fase) * this.amplitud;
+    }
+
+    // Reacción cuando el mouse está cerca
+    let distanciaMouse = dist(mouseX, mouseY, this.x, this.y);
+
+    if (distanciaMouse < this.tam * 1.3) {
+      this.escala = lerp(this.escala, 1.18, 0.09);
+    } else {
+      this.escala = lerp(this.escala, 1, 0.09);
+    }
+  }
+
+  dibujar() {
+    push();
+
+    translate(this.x, this.y);
+    rotate(this.rotacion);
+    scale(this.escala);
+
+    drawingContext.shadowBlur = this === seleccionada ? 18 : 6;
+    drawingContext.shadowColor = modoOscuro ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.18)";
+
+    noStroke();
+    fill(this.colorPrincipal);
+
+    // Tipo de forma
+    if (this.tipo === 0) {
+      this.dibujarCirculo();
+    } else if (this.tipo === 1) {
+      this.dibujarTriangulo();
+    } else if (this.tipo === 2) {
+      this.dibujarRectangulo();
+    } else {
+      this.dibujarArco();
+    }
+
+    this.dibujarDetalleInterno();
+
+    // Marca la pieza seleccionada
+    if (this === seleccionada) {
+      noFill();
+      stroke("#E53935");
+      strokeWeight(3);
+      circle(0, 0, this.tam * 1.45);
+    }
+
+    pop();
+  }
+
+  dibujarCirculo() {
+    circle(0, 0, this.tam);
+
+    fill(this.colorSecundario);
+    circle(this.tam * 0.12, -this.tam * 0.1, this.tam * 0.52);
+  }
+
+  dibujarTriangulo() {
+    triangle(
+      -this.tam * 0.58,
+      this.tam * 0.48,
+      0,
+      -this.tam * 0.62,
+      this.tam * 0.58,
+      this.tam * 0.48
+    );
+
+    fill(this.colorSecundario);
+    circle(0, this.tam * 0.12, this.tam * 0.28);
+  }
+
+  dibujarRectangulo() {
+    rect(0, 0, this.tam * 1.25, this.tam * 0.68);
+
+    fill(this.colorSecundario);
+    rect(this.tam * 0.18, 0, this.tam * 0.28, this.tam * 0.68);
+  }
+
+  dibujarArco() {
+    noFill();
+    stroke(this.colorPrincipal);
+    strokeWeight(this.tam * 0.18);
+    arc(0, 0, this.tam, this.tam, 20, 300);
+
+    noStroke();
+    fill(this.colorSecundario);
+    circle(this.tam * 0.28, -this.tam * 0.18, this.tam * 0.2);
+  }
+
+  dibujarDetalleInterno() {
+    push();
+
+    rotate(this.desfaseInterno);
+
+    stroke(this.colorSecundario);
+    strokeWeight(this.grosorLinea);
+
+    // Líneas internas repetidas
+    for (let i = 0; i < this.repeticiones; i++) {
+      let yLinea = map(
+        i,
+        0,
+        this.repeticiones - 1,
+        -this.tam * 0.36,
+        this.tam * 0.36
+      );
+
+      line(-this.tam * 0.48, yLinea, this.tam * 0.48, yLinea);
+    }
+
+    pop();
+  }
+
+  contiene(px, py) {
+    // Área simple para seleccionar
+    let d = dist(px, py, this.x, this.y);
+    return d < this.tam * 0.75;
+  }
+
+  alterarPorClick() {
+    // Cambia solo esta pieza
+    this.colorPrincipal = random(paleta);
+    this.colorSecundario = random(paleta);
+    this.tipo = int(random(4));
+    this.velocidad = random(-2, 2);
+    this.repeticiones = int(random(2, 10));
+    this.grosorLinea = random(1, 4);
+  }
+
+  arrastrar(px, py) {
+    this.x = px;
+    this.y = py;
+
+    // Gira un poco mientras se arrastra
+    this.rotacion += 2.5;
+  }
+
+  cambiarTamano(delta) {
+    // Agranda o achica
+    if (delta > 0) {
+      this.tam *= 0.93;
+    } else {
+      this.tam *= 1.07;
+    }
+
+    this.tam = constrain(this.tam, 25, 190);
+  }
+
+  randomizar() {
+    // Cambia los valores principales
+    this.tam = random(45, 135);
+    this.tipo = int(random(4));
+    this.colorPrincipal = random(paleta);
+    this.colorSecundario = random(paleta);
+    this.rotacion = random(360);
+    this.velocidad = random(-1.8, 1.8);
+    this.repeticiones = int(random(2, 10));
+    this.grosorLinea = random(1, 4);
+    this.desfaseInterno = random(360);
+  }
+
+  exportar() {
+    // Guarda los datos importantes
+    return {
+      x: this.x,
+      y: this.y,
+      tam: this.tam,
+      tipo: this.tipo,
+      colorPrincipal: this.colorPrincipal,
+      colorSecundario: this.colorSecundario,
+      rotacion: this.rotacion,
+      velocidad: this.velocidad,
+      repeticiones: this.repeticiones,
+      fase: this.fase,
+      amplitud: this.amplitud,
+      grosorLinea: this.grosorLinea,
+      desfaseInterno: this.desfaseInterno
+    };
+  }
+
+  static desdeDatos(d) {
+    // Reconstruye una pieza desde el historial
+    let pieza = new PiezaBauhaus(
+      d.x,
+      d.y,
+      d.tam,
+      d.tipo,
+      d.colorPrincipal,
+      d.colorSecundario,
+      d.rotacion,
+      d.velocidad,
+      d.repeticiones
+    );
+
+    pieza.fase = d.fase;
+    pieza.amplitud = d.amplitud;
+    pieza.grosorLinea = d.grosorLinea;
+    pieza.desfaseInterno = d.desfaseInterno;
+
+    return pieza;
+  }
+}
