@@ -1,0 +1,318 @@
+// Encargo OOP - Entrega 2
+// Concepto: Tensión geométrica
+// Estilo: abstracción geométrica / Bauhaus / constructivismo
+
+let modulos = [];
+let cantidad = 18;
+
+let paleta = [
+  "#ff1f1f", // rojo
+  "#ffb52e", // amarillo/naranjo
+  "#16a6c9", // celeste
+  "#005fba", // azul
+  "#000000", // negro
+  "#f5efe6"  // crema
+];
+
+let animar = true;
+let mostrarLineas = true;
+let modoOscuro = false;
+let seleccionado = null;
+
+function setup() {
+  createCanvas(900, 560);
+  angleMode(DEGREES);
+  generarComposicion();
+}
+
+function draw() {
+  background(modoOscuro ? "#111111" : "#f5efe6");
+
+  // Líneas de fondo estilo constructivista
+  if (mostrarLineas) {
+    dibujarLineasFondo();
+  }
+
+  // Dibujar y actualizar todos los objetos usando for loop
+  for (let i = 0; i < modulos.length; i++) {
+    modulos[i].actualizar();
+    modulos[i].dibujar();
+  }
+
+  dibujarUI();
+}
+
+function generarComposicion() {
+  modulos = [];
+
+  for (let i = 0; i < cantidad; i++) {
+    let x = random(80, width - 80);
+    let y = random(80, height - 80);
+    let tam = random(45, 120);
+    let tipo = int(random(3)); // 0 círculo, 1 triángulo, 2 rectángulo
+    let col = random(paleta);
+    let rot = random(360);
+    let vel = random(0.2, 1.4);
+    let repeticiones = int(random(2, 7));
+
+    modulos.push(new ModuloGeometrico(x, y, tam, tipo, col, rot, vel, repeticiones));
+  }
+
+  seleccionado = null;
+}
+
+function dibujarLineasFondo() {
+  stroke(modoOscuro ? 255 : 0, 55);
+  strokeWeight(1);
+
+  for (let i = 0; i < 18; i++) {
+    let x = random(width);
+    let y = random(height);
+    line(x, y, x + random(-80, 120), y + random(-50, 80));
+  }
+
+  noStroke();
+
+  // Puntos pequeños de textura
+  fill(modoOscuro ? 255 : 0, 90);
+  for (let i = 0; i < 90; i++) {
+    circle(random(width), random(height), random(1, 3));
+  }
+}
+
+function dibujarUI() {
+  noStroke();
+  fill(modoOscuro ? 255 : 0);
+  textSize(13);
+  text("ESPACIO: reset | R: randomizar | A: animación | L: líneas | O: modo oscuro", 20, height - 38);
+  text("Click/drag: alterar objeto | Rueda mouse: tamaño | Doble click: crear objeto", 20, height - 18);
+}
+
+// -------------------------
+// INTERACCIONES DE TECLADO
+// -------------------------
+
+function keyPressed() {
+  // Reset obligatorio
+  if (key === " ") {
+    generarComposicion();
+  }
+
+  // Randomiza apariencia
+  if (key === "r" || key === "R") {
+    for (let i = 0; i < modulos.length; i++) {
+      modulos[i].randomizarApariencia();
+    }
+  }
+
+  // Activa/desactiva animación
+  if (key === "a" || key === "A") {
+    animar = !animar;
+  }
+
+  // Activa/desactiva líneas de fondo
+  if (key === "l" || key === "L") {
+    mostrarLineas = !mostrarLineas;
+  }
+
+  // Cambia modo claro/oscuro
+  if (key === "o" || key === "O") {
+    modoOscuro = !modoOscuro;
+  }
+}
+
+// -------------------------
+// INTERACCIONES DE MOUSE
+// -------------------------
+
+function mousePressed() {
+  seleccionado = null;
+
+  // Buscar objeto clickeado desde el último hacia atrás
+  // para seleccionar el que está más encima
+  for (let i = modulos.length - 1; i >= 0; i--) {
+    if (modulos[i].contiene(mouseX, mouseY)) {
+      seleccionado = modulos[i];
+      seleccionado.alterarPorClick();
+      break;
+    }
+  }
+}
+
+function mouseDragged() {
+  if (seleccionado !== null) {
+    seleccionado.arrastrar(mouseX, mouseY);
+  }
+}
+
+function mouseWheel(event) {
+  if (seleccionado !== null) {
+    seleccionado.cambiarTamano(event.delta);
+  }
+
+  return false;
+}
+
+function doubleClicked() {
+  let nuevo = new ModuloGeometrico(
+    mouseX,
+    mouseY,
+    random(55, 120),
+    int(random(3)),
+    random(paleta),
+    random(360),
+    random(0.3, 1.5),
+    int(random(2, 8))
+  );
+
+  modulos.push(nuevo);
+}
+
+// -------------------------
+// CLASE PRINCIPAL
+// -------------------------
+
+class ModuloGeometrico {
+  constructor(x, y, tam, tipo, col, rot, vel, repeticiones) {
+    this.x = x;
+    this.y = y;
+    this.tam = tam;
+    this.tipo = tipo;
+    this.col = col;
+    this.rot = rot;
+    this.vel = vel;
+    this.repeticiones = repeticiones;
+
+    this.offsetX = random(-1, 1);
+    this.offsetY = random(-1, 1);
+
+    this.escala = 1;
+    this.seleccionado = false;
+    this.colorSecundario = random(paleta);
+    this.grosorLinea = random(1, 4);
+  }
+
+  actualizar() {
+    if (animar) {
+      this.rot += this.vel;
+
+      // Movimiento leve, como flotando
+      this.x += sin(frameCount * 0.5 + this.offsetX * 100) * 0.15;
+      this.y += cos(frameCount * 0.4 + this.offsetY * 100) * 0.15;
+    }
+
+    // Interacción por proximidad del mouse
+    let d = dist(mouseX, mouseY, this.x, this.y);
+
+    if (d < 120) {
+      this.escala = lerp(this.escala, 1.22, 0.08);
+    } else {
+      this.escala = lerp(this.escala, 1, 0.08);
+    }
+  }
+
+  dibujar() {
+    push();
+    translate(this.x, this.y);
+    rotate(this.rot);
+    scale(this.escala);
+
+    noStroke();
+
+    fill(this.col);
+
+    if (this.tipo === 0) {
+      this.dibujarCirculo();
+    } else if (this.tipo === 1) {
+      this.dibujarTriangulo();
+    } else if (this.tipo === 2) {
+      this.dibujarRectangulo();
+    }
+
+    this.dibujarElementosInternos();
+
+    // Contorno si está seleccionado
+    if (this === seleccionado) {
+      noFill();
+      stroke("#ff1f1f");
+      strokeWeight(3);
+      circle(0, 0, this.tam * 1.4);
+    }
+
+    pop();
+  }
+
+  dibujarCirculo() {
+    circle(0, 0, this.tam);
+
+    // Círculo interno tipo Bauhaus
+    fill(this.colorSecundario);
+    circle(0, 0, this.tam * 0.55);
+  }
+
+  dibujarTriangulo() {
+    triangle(
+      -this.tam * 0.55, this.tam * 0.45,
+      0, -this.tam * 0.6,
+      this.tam * 0.55, this.tam * 0.45
+    );
+  }
+
+  dibujarRectangulo() {
+    rectMode(CENTER);
+    rect(0, 0, this.tam * 1.25, this.tam * 0.65);
+  }
+
+  dibujarElementosInternos() {
+    stroke(this.colorSecundario);
+    strokeWeight(this.grosorLinea);
+
+    for (let i = 0; i < this.repeticiones; i++) {
+      let separacion = map(i, 0, this.repeticiones - 1, -this.tam * 0.4, this.tam * 0.4);
+      line(-this.tam * 0.45, separacion, this.tam * 0.45, separacion);
+    }
+
+    noStroke();
+  }
+
+  contiene(px, py) {
+    let d = dist(px, py, this.x, this.y);
+    return d < this.tam * 0.7;
+  }
+
+  alterarPorClick() {
+    this.col = random(paleta);
+    this.colorSecundario = random(paleta);
+    this.tipo = int(random(3));
+    this.repeticiones = int(random(2, 8));
+    this.vel = random(0.2, 2.2);
+  }
+
+  arrastrar(px, py) {
+    this.x = px;
+    this.y = py;
+
+    // El arrastre también modifica la rotación
+    this.rot += 3;
+  }
+
+  cambiarTamano(delta) {
+    if (delta > 0) {
+      this.tam *= 0.94;
+    } else {
+      this.tam *= 1.06;
+    }
+
+    this.tam = constrain(this.tam, 25, 180);
+  }
+
+  randomizarApariencia() {
+    this.col = random(paleta);
+    this.colorSecundario = random(paleta);
+    this.tam = random(45, 140);
+    this.rot = random(360);
+    this.vel = random(0.2, 1.8);
+    this.repeticiones = int(random(2, 8));
+    this.grosorLinea = random(1, 4);
+  }
+}
