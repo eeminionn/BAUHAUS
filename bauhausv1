@@ -1,6 +1,8 @@
-// Encargo OOP - Entrega 2
-// Concepto: Tensión geométrica
-// Estilo: abstracción geométrica / Bauhaus / constructivismo
+// Proyecto OOP - Composición interactiva Bauhaus
+// Concepto: BAUHAUS
+// Autor: @eeminionn en GitHub
+// Repositorio: https://github.com/eeminionn/BAUHAUS/blob/main/bauhausv1
+// Desarrollado en p5.js como avance para la entrega 2
 
 let modulos = [];
 let cantidad = 18;
